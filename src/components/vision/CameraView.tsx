@@ -121,8 +121,10 @@ const CameraView: React.FC<CameraViewProps> = ({
     // Set flag to indicate camera start in progress
     startingCameraRef.current = true;
     
-    // Clean up any existing camera resources
-    cleanupCamera();
+    // Clean up any existing camera resources only if we are switching or recovering
+    if (isActive || streamRef.current) {
+      cleanupCamera();
+    }
     
     // Show loading state
     setIsLoading(true);
@@ -179,7 +181,10 @@ const CameraView: React.FC<CameraViewProps> = ({
     } catch (err: any) {
       console.error('Error accessing camera:', err);
       
-      cleanupCamera();
+      // Do not immediately cleanup if we already have a playing stream to avoid flicker
+      if (!isActive) {
+        cleanupCamera();
+      }
       startingCameraRef.current = false;
       
       // Enhanced error messages for mobile users
@@ -267,20 +272,17 @@ const CameraView: React.FC<CameraViewProps> = ({
     };
   }, []);
 
-  // Handle facing mode changes
+  // Handle facing mode changes only when the facingMode value actually changes
+  const previousFacingModeRef = useRef<typeof facingMode>(facingMode);
   useEffect(() => {
-    // If the camera is already active and the facing mode changes, restart the camera
-    if (isActive || isLoading) {
-      // Add a small delay to ensure previous camera is fully cleaned up
+    if (previousFacingModeRef.current !== facingMode) {
       const timer = setTimeout(() => {
         startCamera();
-      }, 500);
-      
-      return () => {
-        clearTimeout(timer);
-      };
+      }, 300);
+      previousFacingModeRef.current = facingMode;
+      return () => clearTimeout(timer);
     }
-  }, [facingMode, startCamera, isActive, isLoading]);
+  }, [facingMode, startCamera]);
 
   // Function to retry camera access
   const retryCamera = () => {
