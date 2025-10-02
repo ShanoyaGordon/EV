@@ -71,6 +71,7 @@ const Camera = () => {
   const lastAnnouncementTimeRef = useRef<number>(0);
   const speechFailureCountRef = useRef<number>(0);
   const [useLightweightMode, setUseLightweightMode] = useState<boolean>(false);
+  const cloudSuggestionShownRef = useRef<boolean>(false);
   const [navigationInstructions, setNavigationInstructions] = useState<{
     id: number;
     text: string;
@@ -86,12 +87,17 @@ const Camera = () => {
   const isiOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && (navigator as any).maxTouchPoints > 1);
 
   useEffect(() => {
-    if (deviceInfo.needsCloudProcessing && !cloudDetection.settings.enabled) {
+    const usingExternalAzureOrDeepseek = apiSettings.useExternalApi && (apiSettings.preferredProvider === 'azure' || apiSettings.preferredProvider === 'deepseek');
+    if (deviceInfo.needsCloudProcessing 
+        && !cloudDetection.settings.enabled 
+        && !usingExternalAzureOrDeepseek
+        && !cloudSuggestionShownRef.current) {
       setTimeout(() => {
         toast({
           title: "Performance Recommendation",
           description: "Your device may benefit from cloud processing. Consider enabling it in settings.",
         });
+        cloudSuggestionShownRef.current = true;
       }, 5000);
     }
     
