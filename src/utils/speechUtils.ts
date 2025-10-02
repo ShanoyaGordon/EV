@@ -382,34 +382,26 @@ export function createDescriptionFromObjects(detections: DetectedObject[]): stri
   // Limit to closest 3 objects to avoid information overload
   const limitedObjects = nearbyObjects.slice(0, 3);
   
-  // Create position-based descriptions for each object without exact measurements
+  // Create concise, directive phrases for each object
   const objectDescriptions = limitedObjects.map(obj => {
     const label = normalizeObjectLabel(obj.label || 'object');
     const position = getObjectPosition(obj);
     const distance = obj.distance !== undefined ? obj.distance : 5;
-    
-    // Create more natural language description based on position and proximity
+
+    const posWord = position === 'left' ? 'Left' : position === 'right' ? 'Right' : 'Ahead';
+    let directive = '';
+
     if (position === 'center') {
-      if (distance < 3.0) {
-        return `${label} directly ahead—approaching quickly`;
-      } else if (distance < 7.0) {
-        return `${label} ahead—prepare to navigate around it`;
-      } else {
-        return `${label} ahead in your path`;
-      }
+      if (distance < 1.5) directive = 'stop';
+      else if (distance < 3.5) directive = 'pass around';
     } else if (position === 'left') {
-      if (distance < 5.0) {
-        return `${label} approaching on your left—consider moving right`;
-      } else {
-        return `${label} to your left`;
-      }
-    } else { // right
-      if (distance < 5.0) {
-        return `${label} approaching on your right—consider moving left`;
-      } else {
-        return `${label} to your right`;
-      }
+      if (distance < 5.0) directive = 'move right';
+    } else if (position === 'right') {
+      if (distance < 5.0) directive = 'move left';
     }
+
+    const base = `${posWord} ${label} ${distance.toFixed(1)}m`;
+    return directive ? `${base} — ${directive}` : base;
   });
   
   // Join descriptions based on number of objects
@@ -465,30 +457,20 @@ export function generateNavigationInstructions(detections: DetectedObject[]): {
     priority = 'low';
   }
   
-  // Generate instruction based on position and proximity
-  let instruction = "";
-  
+  // Generate concise single instruction for the closest object
+  const posWord = objectPosition === 'left' ? 'Left' : objectPosition === 'right' ? 'Right' : 'Ahead';
+  let directive = '';
   if (objectPosition === 'center') {
-    if (distanceMeters < 3.0) {
-      instruction = `${normalizedLabel} ahead ${distanceMeters.toFixed(1)} meters—prepare to stop or change direction`;
-    } else if (distanceMeters < 7.0) {
-      instruction = `${normalizedLabel} ahead ${distanceMeters.toFixed(1)} meters—prepare to navigate around it`;
-    } else {
-      instruction = `${normalizedLabel} ahead in your path, ${distanceMeters.toFixed(1)} meters away`;
-    }
+    if (distanceMeters < 1.5) directive = 'stop';
+    else if (distanceMeters < 3.5) directive = 'pass around';
   } else if (objectPosition === 'left') {
-    if (distanceMeters < 5.0) {
-      instruction = `${normalizedLabel} ${distanceMeters.toFixed(1)} meters to your left—consider moving right`;
-    } else {
-      instruction = `${normalizedLabel} to your left, ${distanceMeters.toFixed(1)} meters away`;
-    }
+    if (distanceMeters < 5.0) directive = 'move right';
   } else if (objectPosition === 'right') {
-    if (distanceMeters < 5.0) {
-      instruction = `${normalizedLabel} ${distanceMeters.toFixed(1)} meters to your right—consider moving left`;
-    } else {
-      instruction = `${normalizedLabel} to your right, ${distanceMeters.toFixed(1)} meters away`;
-    }
+    if (distanceMeters < 5.0) directive = 'move left';
   }
+
+  const base = `${posWord} ${normalizedLabel} ${distanceMeters.toFixed(1)}m`;
+  const instruction = directive ? `${base} — ${directive}` : base;
   
   return {
     text: instruction,
