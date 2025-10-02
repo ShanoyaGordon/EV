@@ -26,6 +26,7 @@ import {
   getSpeechQueueLength
 } from '@/utils/speechUtils';
 import { useDeviceInfo } from '@/hooks/use-mobile';
+import { setInUserGesture } from '@/utils/speechUtils';
 import { useCloudDetection } from '@/hooks/use-cloud-detection';
 
 const Camera = () => {
@@ -81,6 +82,8 @@ const Camera = () => {
   const [detectionFailureCount, setDetectionFailureCount] = useState(0);
   const processingTimeRef = useRef<number[]>([]);
   const frameCountRef = useRef<number>(0);
+  const [voiceEnabled, setVoiceEnabled] = useState<boolean>(false);
+  const isiOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && (navigator as any).maxTouchPoints > 1);
 
   useEffect(() => {
     if (deviceInfo.needsCloudProcessing && !cloudDetection.settings.enabled) {
@@ -115,7 +118,11 @@ const Camera = () => {
     
     loadStoredConfig();
     
-    initSpeechSynthesis();
+    // Initialize speech synthesis early for iOS Chrome unlock
+    try { initSpeechSynthesis(); } catch (e) {}
+    if (!isiOS) {
+      setVoiceEnabled(true);
+    }
     
     return () => {
       if (detectionIntervalRef.current) {
@@ -401,6 +408,7 @@ const Camera = () => {
   };
 
   const announceSpeech = async (text: string) => {
+    if (!voiceEnabled) return;
     try {
       const useRecoveryMode = speechFailureCountRef.current > 2;
       
@@ -590,6 +598,27 @@ const Camera = () => {
           />
         </div>
 
+        {isiOS && !voiceEnabled && (
+          <div className="absolute bottom-28 left-0 right-0 z-30 px-6">
+            <Button
+              className="w-full bg-blue-500 hover:bg-blue-600 text-white rounded-full py-3 shadow-xl border border-white/20"
+              onClick={() => {
+                try { setInUserGesture(true); initSpeechSynthesis(); } catch {}
+                setVoiceEnabled(true);
+                try {
+                  speak("Voice enabled. I will announce nearby objects.", {
+                    rate: apiSettings.speechRate,
+                    volume: apiSettings.speechVolume,
+                    queueMode: 'flush'
+                  });
+                } catch {}
+              }}
+            >
+              Enable Voice Guidance
+            </Button>
+          </div>
+        )}
+
         {/* Cloud Detection Button - Mobile Only */}
         {deviceInfo.isMobile && (
           <Button
@@ -623,7 +652,10 @@ const Camera = () => {
             {/* Main Scan Button */}
             <Button
               className="h-20 w-20 rounded-full bg-blue-500 hover:bg-blue-600 flex items-center justify-center p-0 shadow-2xl transition-all hover:scale-105 border-4 border-white/30"
-              onClick={handleManualScan}
+              onClick={(e) => {
+                try { setInUserGesture(true); } catch {}
+                handleManualScan();
+              }}
             >
               <div className="h-16 w-16 rounded-full bg-blue-600 flex items-center justify-center">
                 <CameraIcon className="h-7 w-7 text-white" />

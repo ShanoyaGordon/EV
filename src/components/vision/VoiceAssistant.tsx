@@ -4,6 +4,7 @@ import { Mic, MicOff, Volume2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { textToSpeech, stopSpeech } from '@/utils/cartesiaService';
+import { initSpeechSynthesis, setInUserGesture } from '@/utils/speechUtils';
 
 interface VoiceAssistantProps {
   isListening?: boolean;
@@ -23,6 +24,11 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
   const recognitionStartedRef = useRef<boolean>(false);
 
   useEffect(() => {
+    // Ensure speech synthesis is initialized for iOS Chrome unlock
+    try {
+      initSpeechSynthesis();
+    } catch (e) {}
+
     // Initialize speech recognition
     if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
       const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -173,7 +179,11 @@ const VoiceAssistant: React.FC<VoiceAssistantProps> = ({
             isRecording ? "bg-primary text-white" : "bg-muted",
             isSpeaking ? "ring-2 ring-primary ring-offset-2" : ""
           )}
-          onClick={toggleRecognition}
+          onClick={(e) => {
+            // Mark user gesture for iOS speech gating
+            try { setInUserGesture(true); } catch {}
+            toggleRecognition();
+          }}
         >
           {isRecording ? (
             <Mic className="h-6 w-6" />

@@ -95,6 +95,9 @@ export function initSpeechSynthesis() {
           audioContext.resume();
         }
         
+        // Mark that we've had a user gesture for iOS speech gating
+        inUserGesture = true;
+        
         // Remove the event listeners after first use
         document.removeEventListener('touchstart', unlockAudio);
         document.removeEventListener('touchend', unlockAudio);
