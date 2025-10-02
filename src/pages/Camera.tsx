@@ -25,6 +25,7 @@ import {
   generateNavigationInstructions,
   getSpeechQueueLength
 } from '@/utils/speechUtils';
+import { textToSpeech, saveCartesiaApiKey } from '@/utils/cartesiaService';
 import { useDeviceInfo } from '@/hooks/use-mobile';
 import { setInUserGesture } from '@/utils/speechUtils';
 import { useCloudDetection } from '@/hooks/use-cloud-detection';
@@ -58,6 +59,8 @@ const Camera = () => {
     preferredProvider: 'azure' as 'azure' | 'deepseek' | 'cloud',
     speechRate: 1.0,
     speechVolume: 1.0,
+    useCartesiaTTS: (() => { try { return !!(JSON.parse(localStorage.getItem('vision_api_config') || '{}').useCartesiaTTS); } catch { return false; } })(),
+    cartesiaApiKey: localStorage.getItem('cartesia_api_key') || ''
   });
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [cameraFacingMode, setCameraFacingMode] = useState<'user' | 'environment'>('environment');
@@ -114,7 +117,9 @@ const Camera = () => {
           const parsedConfig = JSON.parse(storedConfig);
           setApiSettings(prevSettings => ({
             ...prevSettings,
-            ...parsedConfig
+            ...parsedConfig,
+            useCartesiaTTS: !!parsedConfig.useCartesiaTTS,
+            cartesiaApiKey: localStorage.getItem('cartesia_api_key') || prevSettings.cartesiaApiKey
           }));
         }
       } catch (error) {
@@ -424,12 +429,16 @@ const Camera = () => {
       
       setIsSpeaking(true);
       
-      await speak(simplifiedText, {
-        rate: useRecoveryMode ? 1.0 : apiSettings.speechRate,
-        volume: apiSettings.speechVolume,
-        queueMode: 'flush',
-        interrupt: true
-      });
+      if (apiSettings.useCartesiaTTS && apiSettings.cartesiaApiKey) {
+        await textToSpeech(simplifiedText);
+      } else {
+        await speak(simplifiedText, {
+          rate: useRecoveryMode ? 1.0 : apiSettings.speechRate,
+          volume: apiSettings.speechVolume,
+          queueMode: 'flush',
+          interrupt: true
+        });
+      }
       
       speechFailureCountRef.current = 0;
       setIsSpeaking(false);
@@ -451,11 +460,15 @@ const Camera = () => {
   const speakMessage = async (text: string) => {
     try {
       setIsSpeaking(true);
-      await speak(text, {
-        rate: apiSettings.speechRate,
-        volume: apiSettings.speechVolume,
-        queueMode: 'immediate'
-      });
+      if (apiSettings.useCartesiaTTS && apiSettings.cartesiaApiKey) {
+        await textToSpeech(text);
+      } else {
+        await speak(text, {
+          rate: apiSettings.speechRate,
+          volume: apiSettings.speechVolume,
+          queueMode: 'immediate'
+        });
+      }
       setIsSpeaking(false);
     } catch (error) {
       console.error("Text-to-speech failed:", error);
@@ -476,6 +489,9 @@ const Camera = () => {
   const handleSaveApiSettings = () => {
     saveAzureApiKey(apiSettings.azureApiKey);
     saveDeepseekApiKey(apiSettings.deepseekApiKey);
+    if (apiSettings.cartesiaApiKey) {
+      saveCartesiaApiKey(apiSettings.cartesiaApiKey);
+    }
     
     try {
       localStorage.setItem('vision_api_config', JSON.stringify({
@@ -485,7 +501,8 @@ const Camera = () => {
         useCloudDetection: apiSettings.useCloudDetection,
         preferredProvider: apiSettings.preferredProvider,
         speechRate: apiSettings.speechRate,
-        speechVolume: apiSettings.speechVolume
+        speechVolume: apiSettings.speechVolume,
+        useCartesiaTTS: apiSettings.useCartesiaTTS
       }));
     } catch (error) {
       console.error('Error saving configuration to localStorage:', error);
@@ -928,6 +945,31 @@ const Camera = () => {
                 
                 <div className="flex items-center space-x-2">
                   <Switch
+                    id="use-cartesia-tts"
+                    checked={apiSettings.useCartesiaTTS}
+                    onCheckedChange={(checked) => setApiSettings({...apiSettings, useCartesiaTTS: checked})}
+                  />
+                  <Label htmlFor="use-cartesia-tts">High-quality TTS (Cartesia)</Label>
+                </div>
+
+                {apiSettings.useCartesiaTTS && (
+                  <div className="grid gap-2">
+                    <Label htmlFor="cartesia-key">Cartesia API Key</Label>
+                    <Input
+                      id="cartesia-key"
+                      type="password"
+                      placeholder="Your Cartesia API Key"
+                      value={apiSettings.cartesiaApiKey}
+                      onChange={(e) => setApiSettings({...apiSettings, cartesiaApiKey: e.target.value})}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Stored locally in your browser; used only for TTS
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex items-center space-x-2">
+                  <Switch
                     id="continuous-speech"
                     checked={continuousSpeech}
                     onCheckedChange={(checked) => setContinuousSpeech(checked)}
@@ -997,11 +1039,17 @@ const Camera = () => {
                 <Button 
                   variant="outline" 
                   className="w-full mt-4"
-                  onClick={() => speak("This is a test of the speech settings. How does this sound?", {
-                    rate: apiSettings.speechRate,
-                    volume: apiSettings.speechVolume,
-                    queueMode: 'immediate'
-                  })}
+                  onClick={async () => {
+                    if (apiSettings.useCartesiaTTS && apiSettings.cartesiaApiKey) {
+                      try { await textToSpeech("This is a test of the speech settings. How does this sound?"); } catch {}
+                    } else {
+                      speak("This is a test of the speech settings. How does this sound?", {
+                        rate: apiSettings.speechRate,
+                        volume: apiSettings.speechVolume,
+                        queueMode: 'immediate'
+                      })
+                    }
+                  }}
                 >
                   Test Speech
                 </Button>
