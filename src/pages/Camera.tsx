@@ -327,9 +327,9 @@ const Camera = () => {
       
       setDetections(prioritizedDetections);
       
-      const objectsWithinRange = prioritizedDetections.filter(obj => 
-        obj.distance !== undefined && obj.distance <= 5.0
-      );
+      const objectsWithinRange = prioritizedDetections
+        .map(obj => ({ ...obj, distance: obj.distance !== undefined ? obj.distance : 5.0 }))
+        .filter(obj => obj.distance !== undefined && obj.distance <= 5.0);
       
       setNearbyObjects(objectsWithinRange);
       

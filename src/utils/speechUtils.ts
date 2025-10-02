@@ -365,8 +365,12 @@ export function createDescriptionFromObjects(detections: DetectedObject[]): stri
     return "Path is clear";
   }
   
-  // Filter to objects within 11 meters
+  // Ensure a distance is available; default to 5.0m if missing, then filter
   const nearbyObjects = detections
+    .map(obj => ({
+      ...obj,
+      distance: obj.distance !== undefined ? obj.distance : 5.0
+    }))
     .filter(obj => obj.distance !== undefined && obj.distance <= 11.0)
     .sort((a, b) => {
       // Sort by distance, prioritizing closer objects
@@ -426,8 +430,12 @@ export function generateNavigationInstructions(detections: DetectedObject[]): {
     };
   }
   
-  // Filter to objects within 11 meters and sort by distance
+  // Ensure a distance is available; default to 5.0m if missing, then sort
   const nearbyObjects = detections
+    .map(obj => ({
+      ...obj,
+      distance: obj.distance !== undefined ? obj.distance : 5.0
+    }))
     .filter(obj => obj.distance !== undefined && obj.distance <= 11.0)
     .sort((a, b) => {
       const distA = a.distance || 999;
