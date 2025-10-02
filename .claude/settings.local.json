@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(rg:*)",
+      "Bash(grep:*)",
+      "Bash(rm:*)",
+      "Bash(npm run build:*)",
+      "Bash(npx tsc:*)",
+      "Bash(sed:*)",
+      "Bash(mkdir:*)",
+      "Bash(node:*)",
+      "Bash(npm install:*)",
+      "Bash(bun add:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(bun install:*)",
+      "Bash(chmod:*)",
+      "Bash(bun run:*)",
+      "WebFetch(domain:ui.aceternity.com)",
+      "Bash(cp:*)",
+      "WebFetch(domain:docs.wise.com)",
+      "Bash(npm run type-check:*)",
+      "Bash(npm run lint:*)",
+      "Bash(npx convex:*)",
+      "WebSearch",
+      "WebFetch(domain:wise.design)",
+      "mcp__ide__getDiagnostics",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(where vercel)"
+    ],
+    "deny": [],
+    "defaultMode": "bypassPermissions"
+  }
+}

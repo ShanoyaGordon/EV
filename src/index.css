@@ -1,0 +1,223 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
+    
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    
+    --primary: 221 83% 53%;
+    --primary-foreground: 210 40% 98%;
+    
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
+    
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+    
+    --accent: 220 14% 96%;
+    --accent-foreground: 222 47% 11%;
+    
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+    
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 221 83% 53%;
+    
+    --radius: 0.75rem;
+  }
+ 
+  .dark {
+    --background: 222 47% 11%;
+    --foreground: 210 40% 98%;
+ 
+    --card: 222 47% 11%;
+    --card-foreground: 210 40% 98%;
+ 
+    --popover: 222 47% 11%;
+    --popover-foreground: 210 40% 98%;
+ 
+    --primary: 217 91% 60%;
+    --primary-foreground: 222 47% 11%;
+ 
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 98%;
+ 
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+ 
+    --accent: 217 33% 17%;
+    --accent-foreground: 210 40% 98%;
+ 
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 210 40% 98%;
+ 
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 224 76% 48%;
+  }
+}
+ 
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-white/70 dark:bg-black/70 backdrop-blur-xl border border-white/20 dark:border-white/10 shadow-lg;
+  }
+  
+  .btn-icon {
+    @apply rounded-full p-2 flex items-center justify-center transition-all duration-300 hover:bg-primary/10;
+  }
+  
+  .card-hover {
+    @apply transition-all duration-300 hover:shadow-xl hover:translate-y-[-2px];
+  }
+  
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-blue-400;
+  }
+  
+  .fadeInBottom {
+    animation: fadeInBottom 0.5s ease-in-out forwards;
+    opacity: 0;
+  }
+  
+  .fadeInRight {
+    animation: fadeInRight 0.5s ease-in-out forwards;
+    opacity: 0;
+  }
+}
+
+@keyframes fadeInBottom {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeInRight {
+  from {
+    transform: translateX(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Remove focus outlines for mouse users, keep for keyboard */
+*:focus:not(:focus-visible) {
+  outline: none;
+}
+
+*:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+/* Better image handling */
+img {
+  object-fit: cover;
+  transform: translateZ(0); /* Force GPU acceleration */
+}
+
+/* Animation delays for staggered animations */
+.animation-delay-100 {
+  animation-delay: 100ms;
+}
+.animation-delay-200 {
+  animation-delay: 200ms;
+}
+.animation-delay-300 {
+  animation-delay: 300ms;
+}
+.animation-delay-400 {
+  animation-delay: 400ms;
+}
+.animation-delay-500 {
+  animation-delay: 500ms;
+}
+
+/* Camera viewport styles */
+.camera-viewport {
+  @apply relative overflow-hidden rounded-xl;
+}
+
+.camera-viewport::before {
+  content: "";
+  @apply absolute inset-0 z-10 pointer-events-none border-2 border-white/20 rounded-xl;
+}
+
+/* Detection ring animation */
+.detection-ring {
+  @apply absolute z-20 rounded-full border-2 border-primary/60 animate-radar;
+}
+
+/* Voice listener animation */
+.voice-listener {
+  @apply flex items-center justify-center;
+}
+
+.voice-pulse {
+  @apply flex items-center justify-center;
+}
+
+.voice-pulse span {
+  @apply block w-2 h-2 mx-0.5 bg-primary rounded-full;
+  animation: voicePulse 1.4s ease-in-out infinite;
+}
+
+.voice-pulse span:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.voice-pulse span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.voice-pulse span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+.voice-pulse span:nth-child(4) {
+  animation-delay: 0.6s;
+}
+
+.voice-pulse span:nth-child(5) {
+  animation-delay: 0.8s;
+}
+
+@keyframes voicePulse {
+  0%, 100% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(2);
+  }
+}
