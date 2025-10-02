@@ -624,6 +624,11 @@ const Camera = () => {
               onClick={() => {
                 try { setInUserGesture(true); initSpeechSynthesis(); } catch {}
                 setVoiceEnabled(true);
+                // Kick off an immediate detection pass so we have fresh objects to announce
+                if (videoRef.current) {
+                  lastAnnouncementTimeRef.current = 0; // ensure next announcement isn't delayed
+                  processFrame(videoRef.current);
+                }
                 try {
                   speak("Voice enabled. I will announce nearby objects.", {
                     rate: apiSettings.speechRate,
@@ -631,14 +636,15 @@ const Camera = () => {
                     queueMode: 'flush'
                   });
                 } catch {}
-                // Trigger an immediate announcement if detections exist
+                // Trigger an immediate announcement shortly after detection cycle
                 setTimeout(() => {
-                  if (detections && detections.length > 0) {
-                    const msg = createDescriptionFromObjects(detections);
-                    announceSpeech(msg);
-                    lastAnnouncementTimeRef.current = Date.now();
-                  }
-                }, 200);
+                  const hasDetections = detections && detections.length > 0;
+                  const msg = hasDetections
+                    ? createDescriptionFromObjects(detections)
+                    : "No objects detected at approximately one meter distance.";
+                  announceSpeech(msg);
+                  lastAnnouncementTimeRef.current = Date.now();
+                }, 300);
               }}
             >
               Enable Voice Guidance
