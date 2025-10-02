@@ -88,6 +88,7 @@ const Camera = () => {
   const frameCountRef = useRef<number>(0);
   const [voiceEnabled, setVoiceEnabled] = useState<boolean>(false);
   const isiOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && (navigator as any).maxTouchPoints > 1);
+  const recentAnnouncementsRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
     const usingExternalAzureOrDeepseek = apiSettings.useExternalApi && (apiSettings.preferredProvider === 'azure' || apiSettings.preferredProvider === 'deepseek');
@@ -332,6 +333,27 @@ const Camera = () => {
         .filter(obj => obj.distance !== undefined && obj.distance <= 5.0);
       
       setNearbyObjects(objectsWithinRange);
+
+      // Event-driven announcements for objects in your path (center within ~5m)
+      if (voiceEnabled) {
+        const nowTs = Date.now();
+        let announcedCount = 0;
+        for (const obj of objectsWithinRange) {
+          const centerX = obj.bbox.x + (obj.bbox.width / 2);
+          const isCenter = centerX >= 0.4 && centerX <= 0.6;
+          if (!isCenter) continue;
+          const label = (obj.label || 'object').toLowerCase();
+          const key = `${label}:${Math.round(centerX * 10)}:${Math.round((obj.distance || 5) * 10)}`;
+          const lastTs = recentAnnouncementsRef.current[key] || 0;
+          // Cooldown 3s per similar object to avoid spam
+          if (nowTs - lastTs < 3000) continue;
+          const message = createDescriptionFromObjects([obj]);
+          try { await announceSpeech(message); } catch {}
+          recentAnnouncementsRef.current[key] = nowTs;
+          announcedCount++;
+          if (announcedCount >= 2) break; // avoid flooding per frame
+        }
+      }
       
       if (prioritizedDetections.length > 0) {
         const instruction = generateNavigationInstructions(prioritizedDetections);
