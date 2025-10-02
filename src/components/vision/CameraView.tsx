@@ -24,9 +24,6 @@ const CameraView: React.FC<CameraViewProps> = ({
   const streamRef = useRef<MediaStream | null>(null);
   const animationRef = useRef<number | null>(null);
   const startingCameraRef = useRef<boolean>(false);
-	const wakeLockRef = useRef<any>(null);
-	const keepAliveRef = useRef<number | null>(null);
-	const lastHealthCheckRef = useRef<number>(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isActive, setIsActive] = useState(false);
@@ -44,12 +41,6 @@ const CameraView: React.FC<CameraViewProps> = ({
       cancelAnimationFrame(animationRef.current);
       animationRef.current = null;
     }
-
-		// Stop keep-alive monitor
-		if (keepAliveRef.current) {
-			clearInterval(keepAliveRef.current);
-			keepAliveRef.current = null;
-		}
     
     // Stop all tracks in the stream
     if (streamRef.current) {
@@ -63,15 +54,6 @@ const CameraView: React.FC<CameraViewProps> = ({
     }
     
     setIsActive(false);
-
-		// Release wake lock if held
-		try {
-			if (wakeLockRef.current) {
-				// Do not await inside non-async function
-				wakeLockRef.current.release().catch(() => {});
-				wakeLockRef.current = null;
-			}
-		} catch (_) {}
   }, [videoReference]);
 
   // Process video frames when camera is active
@@ -139,7 +121,7 @@ const CameraView: React.FC<CameraViewProps> = ({
     setIsLoading(true);
     setError(null);
     
-		try {
+    try {
       // Try to get access to the camera with the requested facing mode
       const mobileFacingMode = isMobile ? facingMode : 'environment';
       
@@ -160,25 +142,7 @@ const CameraView: React.FC<CameraViewProps> = ({
       };
       
       console.log(`Attempting to access camera with mode: ${isMobile ? mobileFacingMode : facingMode}`);
-      let stream: MediaStream;
-      try {
-        stream = await navigator.mediaDevices.getUserMedia(constraints);
-      } catch (primaryErr) {
-        // Fallback: try remembered deviceId if available
-        const savedId = localStorage.getItem('ev_last_camera_id');
-        if (savedId) {
-          try {
-            stream = await navigator.mediaDevices.getUserMedia({
-              video: { deviceId: { exact: savedId } },
-              audio: false
-            });
-          } catch (_) {
-            throw primaryErr;
-          }
-        } else {
-          throw primaryErr;
-        }
-      }
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
       
       // Store stream in ref for cleanup
       streamRef.current = stream;
@@ -196,48 +160,6 @@ const CameraView: React.FC<CameraViewProps> = ({
         setRetryCount(0);
         startingCameraRef.current = false;
         
-        // Save chosen deviceId for next launch
-        try {
-          const tracks = stream.getVideoTracks();
-          if (tracks.length && tracks[0].getSettings().deviceId) {
-            localStorage.setItem('ev_last_camera_id', tracks[0].getSettings().deviceId as string);
-          }
-        } catch (_) {}
-
-        // Restart automatically if the track ends (Android/iOS reliability)
-				const videoTracks = stream.getVideoTracks();
-				if (videoTracks.length > 0) {
-					videoTracks[0].onended = () => {
-						console.log('Video track ended, attempting restart…');
-						retryCamera();
-					};
-				}
-				
-				// Request a screen wake lock to avoid sleeps (best-effort)
-				try {
-					if ('wakeLock' in navigator && !wakeLockRef.current) {
-						wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
-						wakeLockRef.current.addEventListener('release', () => {
-							wakeLockRef.current = null;
-						});
-					}
-				} catch (e) {
-					console.log('Wake Lock not available:', e);
-				}
-				
-				// Start a lightweight keep-alive that verifies stream health
-				if (!keepAliveRef.current) {
-					keepAliveRef.current = window.setInterval(() => {
-						const video = videoReference.current;
-						const s = streamRef.current;
-						const unhealthy = !video || !s || !s.active || video.readyState < 2 || video.paused;
-						if (unhealthy && !startingCameraRef.current) {
-							console.log('Camera health check failed, restarting…');
-							retryCamera();
-						}
-					}, 3000);
-				}
-				
         // Start processing frames if callback provided
         if (onFrame) {
           processVideoFrames();
@@ -335,37 +257,6 @@ const CameraView: React.FC<CameraViewProps> = ({
       cleanupCamera();
     };
   }, []);
-
-	// Resume camera when tab/app becomes visible again; release wake lock when hidden
-	useEffect(() => {
-		const onVisibility = () => {
-			if (document.visibilityState === 'visible') {
-				if (!isActive || !streamRef.current || !streamRef.current.active) {
-					retryCamera();
-				}
-				// Best-effort re-acquire wake lock
-				(async () => {
-					try {
-						if ('wakeLock' in navigator && !wakeLockRef.current) {
-							wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
-						}
-					} catch (_) {}
-				})();
-			} else {
-				// Hidden – release wake lock to avoid OS suspending harder
-				try {
-					if (wakeLockRef.current) {
-						wakeLockRef.current.release().catch(() => {});
-						wakeLockRef.current = null;
-					}
-				} catch (_) {}
-			}
-		};
-		document.addEventListener('visibilitychange', onVisibility);
-		return () => {
-			document.removeEventListener('visibilitychange', onVisibility);
-		};
-	}, [isActive, retryCamera]);
 
   // Handle facing mode changes
   useEffect(() => {

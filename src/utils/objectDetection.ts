@@ -490,21 +490,13 @@ const callAzureApi = async (
       return [];
     }
     
-    // Convert base64 to Uint8Array (no Node Buffer in browsers)
-    const binary = atob(imageData);
-    const len = binary.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
-
     const response = await fetch(API_CONFIG.azureApiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/octet-stream',
         'Ocp-Apim-Subscription-Key': API_CONFIG.azureApiKey
       },
-      body: bytes,
-      // Keep the request snappy on mobile networks; we'll fall back on timeout
-      signal: (AbortSignal as any).timeout ? (AbortSignal as any).timeout(4000) : undefined,
+      body: Buffer.from(imageData, 'base64'),
     });
     
     if (!response.ok) {
