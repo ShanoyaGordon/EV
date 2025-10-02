@@ -581,11 +581,7 @@ const Camera = () => {
         {/* Full Screen Camera View */}
         <div className="absolute inset-0 w-full h-full">
           <CameraView
-            onFrame={(imageData) => {
-              if (videoRef.current && modelLoaded && !isDetecting) {
-                processFrame(videoRef.current);
-              }
-            }}
+            onFrame={undefined}
             className="w-full h-full"
             videoRef={videoRef}
             facingMode={cameraFacingMode}

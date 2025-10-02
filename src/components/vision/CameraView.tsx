@@ -34,6 +34,12 @@ const CameraView: React.FC<CameraViewProps> = ({
   // Use external ref if provided, otherwise use internal ref
   const videoReference = externalVideoRef || internalVideoRef;
 
+  // Keep latest onFrame in a ref to avoid changing function identities
+  const onFrameRef = useRef<typeof onFrame>(onFrame);
+  useEffect(() => {
+    onFrameRef.current = onFrame;
+  }, [onFrame]);
+
   // Clean up function to properly stop stream and animation
   const cleanupCamera = useCallback(() => {
     // Cancel any pending animation frame
@@ -58,7 +64,8 @@ const CameraView: React.FC<CameraViewProps> = ({
 
   // Process video frames when camera is active
   const processVideoFrames = useCallback(() => {
-    if (!videoReference.current || !canvasRef.current || !onFrame) return;
+    const callback = onFrameRef.current;
+    if (!videoReference.current || !canvasRef.current || !callback) return;
     
     const ctx = canvasRef.current.getContext('2d');
     if (!ctx) return;
@@ -93,7 +100,7 @@ const CameraView: React.FC<CameraViewProps> = ({
       );
       
       // Pass image data to callback
-      onFrame(imageData);
+      callback(imageData);
     } catch (err) {
       console.error('Error processing frame:', err);
       // Don't set error state here to avoid interrupting the camera feed
@@ -101,7 +108,7 @@ const CameraView: React.FC<CameraViewProps> = ({
     
     // Continue processing frames
     animationRef.current = requestAnimationFrame(processVideoFrames);
-  }, [onFrame, videoReference]);
+  }, [videoReference]);
 
   // Start the camera
   const startCamera = useCallback(async () => {
@@ -130,13 +137,15 @@ const CameraView: React.FC<CameraViewProps> = ({
         video: isMobile 
           ? {
               facingMode: mobileFacingMode,
-              width: { ideal: 720 },
-              height: { ideal: 1280 }
+              width: { ideal: 640 },
+              height: { ideal: 480 },
+              frameRate: { ideal: 15, max: 24 }
             }
           : {
               facingMode: facingMode,
               width: { ideal: 1280 },
-              height: { ideal: 720 }
+              height: { ideal: 720 },
+              frameRate: { ideal: 24, max: 30 }
             },
         audio: false
       };
@@ -242,7 +251,7 @@ const CameraView: React.FC<CameraViewProps> = ({
         description: err.message || "Failed to access camera",
       });
     }
-  }, [facingMode, onFrame, processVideoFrames, cleanupCamera, retryCount, isMobile]);
+  }, [facingMode, processVideoFrames, cleanupCamera, retryCount, isMobile]);
 
   // Initialize camera when component mounts
   useEffect(() => {
