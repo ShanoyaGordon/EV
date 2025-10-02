@@ -346,7 +346,7 @@ const Camera = () => {
         setShowInstructions(true);
       }
       
-      if (continuousSpeech) {
+      if (continuousSpeech && voiceEnabled) {
         const now = Date.now();
         
         if ((now - lastAnnouncementTimeRef.current) > speechInterval) {
@@ -614,6 +614,14 @@ const Camera = () => {
                     queueMode: 'flush'
                   });
                 } catch {}
+                // Trigger an immediate announcement if detections exist
+                setTimeout(() => {
+                  if (detections && detections.length > 0) {
+                    const msg = createDescriptionFromObjects(detections);
+                    announceSpeech(msg);
+                    lastAnnouncementTimeRef.current = Date.now();
+                  }
+                }, 200);
               }}
             >
               Enable Voice Guidance
