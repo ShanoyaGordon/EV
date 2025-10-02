@@ -561,9 +561,9 @@ const Camera = () => {
   return (
     <div className="fixed inset-0 w-full h-full bg-black overflow-hidden">
       <div className="relative w-full h-full flex flex-col">
-        {/* Top Header Bar */}
-        <div className="absolute top-0 left-0 right-0 z-30 px-4 py-4 flex justify-between items-center backdrop-blur-md bg-black/40 border-b border-white/5">
-          <div className="rounded-full bg-black/60 px-4 py-2 flex items-center gap-2 border border-white/20 shadow-lg">
+		{/* Top Header Bar */}
+		<div className="absolute top-0 left-0 right-0 z-30 px-3 py-3 sm:px-4 sm:py-4 flex justify-between items-center backdrop-blur-md bg-black/40 border-b border-white/5">
+			<div className="rounded-full bg-black/60 px-3 py-1.5 sm:px-4 sm:py-2 flex items-center gap-2 border border-white/20 shadow-lg">
             <Users className="h-4 w-4 text-blue-400" />
             <span className="text-sm text-white font-semibold tracking-wide">EchoVision</span>
           </div>
@@ -620,13 +620,13 @@ const Camera = () => {
         )}
 
         {/* Cloud Detection Button - Mobile Only */}
-        {deviceInfo.isMobile && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="absolute top-20 right-4 bg-black/80 text-white border border-white/30 hover:bg-black/90 z-30 hover:text-white shadow-xl backdrop-blur-lg rounded-full px-4 py-2"
-            onClick={() => setShowCloudSettings(true)}
-          >
+		{deviceInfo.isMobile && (
+			<Button
+				variant="outline"
+				size="sm"
+				className="absolute top-20 right-3 sm:right-4 bg-black/80 text-white border border-white/30 hover:bg-black/90 z-30 hover:text-white shadow-xl backdrop-blur-lg rounded-full px-3 py-2 sm:px-4"
+				onClick={() => setShowCloudSettings(true)}
+			>
             {cloudDetection.settings.enabled ? (
               <Cloud className="h-4 w-4 mr-2 text-blue-400" />
             ) : (
@@ -636,29 +636,29 @@ const Camera = () => {
           </Button>
         )}
 
-        {/* Bottom Control Bar */}
-        <div className="absolute bottom-0 left-0 right-0 z-30 pb-8 pt-6 px-6 bg-gradient-to-t from-black/80 via-black/60 to-transparent backdrop-blur-sm">
-          <div className="flex items-center justify-center gap-6 max-w-lg mx-auto">
+		{/* Bottom Control Bar */}
+		<div className="absolute bottom-0 left-0 right-0 z-30 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-4 sm:pt-6 px-4 sm:px-6 bg-gradient-to-t from-black/80 via-black/60 to-transparent backdrop-blur-sm">
+			<div className="flex items-center justify-center gap-5 sm:gap-6 max-w-lg mx-auto">
             {/* Switch Camera Button */}
             <Button
               variant="ghost"
               size="icon"
-              className="text-white hover:text-white bg-black/60 hover:bg-black/80 rounded-full w-14 h-14 border border-white/20 shadow-lg transition-all hover:scale-105"
+					className="text-white hover:text-white bg-black/60 hover:bg-black/80 rounded-full w-12 h-12 sm:w-14 sm:h-14 border border-white/20 shadow-lg transition-all hover:scale-105"
               onClick={handleSwitchCamera}
             >
-              <Repeat className="h-6 w-6" />
+					<Repeat className="h-5 w-5 sm:h-6 sm:w-6" />
             </Button>
 
             {/* Main Scan Button */}
             <Button
-              className="h-20 w-20 rounded-full bg-blue-500 hover:bg-blue-600 flex items-center justify-center p-0 shadow-2xl transition-all hover:scale-105 border-4 border-white/30"
+					className="h-16 w-16 sm:h-20 sm:w-20 rounded-full bg-blue-500 hover:bg-blue-600 flex items-center justify-center p-0 shadow-2xl transition-all hover:scale-105 border-4 border-white/30"
               onClick={(e) => {
                 try { setInUserGesture(true); } catch {}
                 handleManualScan();
               }}
             >
-              <div className="h-16 w-16 rounded-full bg-blue-600 flex items-center justify-center">
-                <CameraIcon className="h-7 w-7 text-white" />
+					<div className="h-12 w-12 sm:h-16 sm:w-16 rounded-full bg-blue-600 flex items-center justify-center">
+						<CameraIcon className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
               </div>
             </Button>
 
@@ -666,7 +666,7 @@ const Camera = () => {
             <Button
               variant="ghost"
               size="icon"
-              className="text-white hover:text-white bg-black/60 hover:bg-black/80 rounded-full w-14 h-14 border border-white/20 shadow-lg transition-all hover:scale-105"
+					className="text-white hover:text-white bg-black/60 hover:bg-black/80 rounded-full w-12 h-12 sm:w-14 sm:h-14 border border-white/20 shadow-lg transition-all hover:scale-105"
               onClick={() => {
                 if (showInstructions) {
                   setShowInstructions(false);
@@ -677,15 +677,15 @@ const Camera = () => {
                 }
               }}
             >
-              <Info className="h-6 w-6" />
+					<Info className="h-5 w-5 sm:h-6 sm:w-6" />
             </Button>
           </div>
         </div>
       </div>
 
-      {/* Navigation Instructions Overlay */}
-      {showInstructions && (
-        <div className="absolute bottom-36 left-4 right-4 z-20">
+		{/* Navigation Instructions Overlay */}
+		{showInstructions && (
+			<div className="absolute bottom-[calc(env(safe-area-inset-bottom)+7rem)] sm:bottom-36 left-3 right-3 sm:left-4 sm:right-4 z-20">
           <NavigationInstructions
             instructions={navigationInstructions}
             isExpanded={isInstructionsExpanded}
