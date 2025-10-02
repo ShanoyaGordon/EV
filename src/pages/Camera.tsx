@@ -25,10 +25,12 @@ import {
   generateNavigationInstructions,
   getSpeechQueueLength
 } from '@/utils/speechUtils';
+import { playEarcon, initEarconsViaGesture, configureEarcons } from '@/utils/earcons';
 import { useDeviceInfo } from '@/hooks/use-mobile';
 import { useCloudDetection } from '@/hooks/use-cloud-detection';
 
 const Camera = () => {
+  const ENV: any = (import.meta as any)?.env || {};
   const navigate = useNavigate();
   const deviceInfo = useDeviceInfo();
   const cloudDetection = useCloudDetection();
@@ -46,17 +48,20 @@ const Camera = () => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [settingsTab, setSettingsTab] = useState("vision");
   const [apiSettings, setApiSettings] = useState({
-    azureApiUrl: localStorage.getItem('vision_api_config') ? JSON.parse(localStorage.getItem('vision_api_config') || '{}').azureApiUrl || 'https://your_endpoint/vision/v3.2/analyze' : 'https://your_endpoint/vision/v3.2/analyze',
-    azureApiKey: localStorage.getItem('azure_api_key') || '',
+    azureApiUrl: ENV.VITE_AZURE_VISION_ENDPOINT || (localStorage.getItem('vision_api_config') ? JSON.parse(localStorage.getItem('vision_api_config') || '{}').azureApiUrl || 'https://your_endpoint/vision/v3.2/analyze' : 'https://your_endpoint/vision/v3.2/analyze'),
+    azureApiKey: ENV.VITE_AZURE_VISION_KEY || localStorage.getItem('azure_api_key') || '',
     deepseekApiUrl: 'https://api.deepseek.com/v1/chat/completions',
-    deepseekApiKey: localStorage.getItem('deepseek_api_key') || import.meta.env.VITE_DEEPSEEK_API_KEY || '',
+    deepseekApiKey: localStorage.getItem('deepseek_api_key') || ENV.VITE_DEEPSEEK_API_KEY || '',
     cloudApiUrl: localStorage.getItem('vision_api_config') ? JSON.parse(localStorage.getItem('vision_api_config') || '{}').cloudApiUrl || 'https://your-cloud-api.com/detect' : 'https://your-cloud-api.com/detect',
     cloudApiKey: localStorage.getItem('cloud_api_key') || '',
     useExternalApi: true,
-    useCloudDetection: localStorage.getItem('vision_api_config') ? JSON.parse(localStorage.getItem('vision_api_config') || '{}').useCloudDetection || false : false,
+    useCloudDetection: false,
     preferredProvider: 'azure' as 'azure' | 'deepseek' | 'cloud',
     speechRate: 1.0,
     speechVolume: 1.0,
+    earconsEnabled: true,
+    hapticsEnabled: true,
+    earconVolume: 0.15,
   });
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [cameraFacingMode, setCameraFacingMode] = useState<'user' | 'environment'>('environment');
@@ -83,15 +88,6 @@ const Camera = () => {
   const frameCountRef = useRef<number>(0);
 
   useEffect(() => {
-    if (deviceInfo.needsCloudProcessing && !cloudDetection.settings.enabled) {
-      setTimeout(() => {
-        toast({
-          title: "Performance Recommendation",
-          description: "Your device may benefit from cloud processing. Consider enabling it in settings.",
-        });
-      }, 5000);
-    }
-    
     const isMobile = deviceInfo.isMobile;
     
     if (isMobile) {
@@ -116,6 +112,22 @@ const Camera = () => {
     loadStoredConfig();
     
     initSpeechSynthesis();
+    // Apply earcon config from stored prefs
+    try {
+      const storedConfig = localStorage.getItem('vision_api_config');
+      const cfg = storedConfig ? JSON.parse(storedConfig) : {};
+      configureEarcons({
+        enableEarcons: cfg.earconsEnabled ?? true,
+        enableHaptics: cfg.hapticsEnabled ?? true,
+        volume: cfg.earconVolume ?? 0.15,
+      });
+      setApiSettings(prev => ({
+        ...prev,
+        earconsEnabled: cfg.earconsEnabled ?? true,
+        hapticsEnabled: cfg.hapticsEnabled ?? true,
+        earconVolume: cfg.earconVolume ?? 0.15,
+      }));
+    } catch {}
     
     return () => {
       if (detectionIntervalRef.current) {
@@ -290,11 +302,22 @@ const Camera = () => {
                                 ? 'cloud' 
                                 : (apiSettings.preferredProvider as 'azure' | 'deepseek' | 'local');
         
-        const result = await detectObjectsWithSource(
-          videoElement, 
-          preferredProvider, 
-          deviceInfo.isMobile
-        );
+        let result;
+        try {
+          result = await detectObjectsWithSource(
+            videoElement, 
+            preferredProvider, 
+            deviceInfo.isMobile
+          );
+        } catch (netErr) {
+          // Network path failed (e.g., Azure timeout). Fall back to local silently.
+          console.warn('Preferred provider failed, falling back to local:', netErr);
+          result = await detectObjectsWithSource(
+            videoElement,
+            'local',
+            deviceInfo.isMobile
+          );
+        }
         
         detectionResults = result.detections;
         source = result.source;
@@ -316,7 +339,9 @@ const Camera = () => {
       setNearbyObjects(objectsWithinRange);
       
       if (prioritizedDetections.length > 0) {
-        const instruction = generateNavigationInstructions(prioritizedDetections);
+      const instruction = generateNavigationInstructions(prioritizedDetections);
+      // Play haptics/earcon per priority to reinforce (best-effort, non-blocking)
+      setTimeout(() => { try { playEarcon(instruction.priority); } catch {} }, 0);
         
         const newInstruction = {
           id: Date.now(),
@@ -460,6 +485,7 @@ const Camera = () => {
   };
 
   const handleSaveApiSettings = () => {
+    // Persist only non-secret UI prefs; keys come from env or local storage helpers
     saveAzureApiKey(apiSettings.azureApiKey);
     saveDeepseekApiKey(apiSettings.deepseekApiKey);
     
@@ -467,11 +493,14 @@ const Camera = () => {
       localStorage.setItem('vision_api_config', JSON.stringify({
         azureApiUrl: apiSettings.azureApiUrl,
         cloudApiUrl: apiSettings.cloudApiUrl,
-        useExternalApi: apiSettings.useExternalApi,
-        useCloudDetection: apiSettings.useCloudDetection,
-        preferredProvider: apiSettings.preferredProvider,
+        useExternalApi: true,
+        useCloudDetection: false,
+        preferredProvider: 'azure',
         speechRate: apiSettings.speechRate,
-        speechVolume: apiSettings.speechVolume
+        speechVolume: apiSettings.speechVolume,
+        earconsEnabled: apiSettings.earconsEnabled,
+        hapticsEnabled: apiSettings.hapticsEnabled,
+        earconVolume: apiSettings.earconVolume
       }));
     } catch (error) {
       console.error('Error saving configuration to localStorage:', error);
@@ -479,20 +508,11 @@ const Camera = () => {
     
     setShowApiSettings(false);
     
-    let description = "Settings updated.";
-    
-    if (apiSettings.useCloudDetection) {
-      description = "Using cloud-based object detection.";
-    } else if (apiSettings.useExternalApi) {
-      const providerName = apiSettings.preferredProvider === 'azure' ? 'Azure Computer Vision' : 'DeepSeek';
-      description = `Using ${providerName} for object detection`;
-    } else {
-      description = "Using local model for object detection";
-    }
+    const description = 'Using Azure Computer Vision for detection';
     
     toast({
       title: "Settings Updated",
-      description: description,
+      description,
     });
     
     speakMessage(description);
@@ -541,8 +561,17 @@ const Camera = () => {
     speakMessage(`Switching to ${cameraFacingMode === 'environment' ? 'front' : 'back'} camera`);
   };
 
-  const handleManualScan = () => {
-    speakMessage("Scanning for objects");
+  const handleManualScan = async () => {
+    // Ensure audio contexts are unlocked and TTS is allowed on iOS (within user gesture)
+    try {
+      initEarconsViaGesture();
+      await speak("Scanning for objects", {
+        rate: apiSettings.speechRate,
+        volume: apiSettings.speechVolume,
+        queueMode: 'immediate',
+        interrupt: true
+      });
+    } catch (_) {}
     lastAnnouncementTimeRef.current = 0;
     
     if (videoRef.current) {
@@ -591,21 +620,7 @@ const Camera = () => {
         </div>
 
         {/* Cloud Detection Button - Mobile Only */}
-        {deviceInfo.isMobile && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="absolute top-20 right-4 bg-black/80 text-white border border-white/30 hover:bg-black/90 z-30 hover:text-white shadow-xl backdrop-blur-lg rounded-full px-4 py-2"
-            onClick={() => setShowCloudSettings(true)}
-          >
-            {cloudDetection.settings.enabled ? (
-              <Cloud className="h-4 w-4 mr-2 text-blue-400" />
-            ) : (
-              <CloudOff className="h-4 w-4 mr-2 text-gray-400" />
-            )}
-            <span className="text-xs font-medium">{cloudDetection.settings.enabled ? "Cloud On" : "Cloud Off"}</span>
-          </Button>
-        )}
+        {/* Cloud button removed for Azure-only flow */}
 
         {/* Bottom Control Bar */}
         <div className="absolute bottom-0 left-0 right-0 z-30 pb-8 pt-6 px-6 bg-gradient-to-t from-black/80 via-black/60 to-transparent backdrop-blur-sm">
@@ -766,9 +781,10 @@ const Camera = () => {
             </DialogHeader>
             
             <Tabs value={settingsTab} onValueChange={setSettingsTab}>
-              <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="vision">Vision APIs</TabsTrigger>
-                <TabsTrigger value="speech">Speech Settings</TabsTrigger>
+                <TabsTrigger value="speech">Speech</TabsTrigger>
+                <TabsTrigger value="earcons">Earcons</TabsTrigger>
               </TabsList>
               
               <TabsContent value="vision" className="space-y-4 py-4">
@@ -964,6 +980,66 @@ const Camera = () => {
                   Test Speech
                 </Button>
               </TabsContent>
+
+              <TabsContent value="earcons" className="space-y-4 py-4">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="earcons-enabled"
+                    checked={apiSettings.earconsEnabled}
+                    onCheckedChange={(checked) => {
+                      setApiSettings({...apiSettings, earconsEnabled: checked});
+                      configureEarcons({ enableEarcons: checked });
+                    }}
+                  />
+                  <Label htmlFor="earcons-enabled">Enable earcon beeps</Label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="haptics-enabled"
+                    checked={apiSettings.hapticsEnabled}
+                    onCheckedChange={(checked) => {
+                      setApiSettings({...apiSettings, hapticsEnabled: checked});
+                      configureEarcons({ enableHaptics: checked });
+                    }}
+                  />
+                  <Label htmlFor="haptics-enabled">Enable haptics (vibration)</Label>
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="earcon-volume">Earcon Volume</Label>
+                  <div className="flex items-center">
+                    <span className="text-xs pr-2">Low</span>
+                    <input
+                      id="earcon-volume"
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={apiSettings.earconVolume}
+                      className="flex-1 cursor-pointer"
+                      onChange={(e) => {
+                        const vol = parseFloat(e.target.value);
+                        setApiSettings({...apiSettings, earconVolume: vol});
+                        configureEarcons({ volume: vol });
+                      }}
+                    />
+                    <span className="text-xs pl-2">High</span>
+                  </div>
+                  <div className="text-center text-sm mt-1">{Math.round(apiSettings.earconVolume * 100)}%</div>
+                </div>
+
+                <Button 
+                  variant="outline" 
+                  className="w-full mt-2"
+                  onClick={() => {
+                    initEarconsViaGesture();
+                    playEarcon('medium');
+                  }}
+                >
+                  Test Earcon
+                </Button>
+              </TabsContent>
             </Tabs>
             
             <DialogFooter>
@@ -975,23 +1051,7 @@ const Camera = () => {
         </Dialog>
 
 
-      {/* Cloud Detection Settings Dialog */}
-      <CloudDetectionSettings
-        open={showCloudSettings}
-        onOpenChange={setShowCloudSettings}
-        settings={{
-          cloudApiUrl: apiSettings.cloudApiUrl,
-          cloudApiKey: apiSettings.cloudApiKey,
-          useCloudDetection: apiSettings.useCloudDetection
-        }}
-        onSettingsChange={(newSettings) => {
-          setApiSettings(prev => ({
-            ...prev,
-            ...newSettings
-          }));
-        }}
-        onSave={handleSaveCloudSettings}
-      />
+      {/* Cloud Detection Settings Dialog removed for Azure-only flow */}
     </div>
   );
 };

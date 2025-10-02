@@ -7,10 +7,10 @@ import { getMobileDetectionSettings } from '@/utils/mobileDetectionHelper';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 const API_CONFIG = {
-  azureApiUrl: 'https://your_endpoint/vision/v3.2/analyze',
-  azureApiKey: '',
+  azureApiUrl: import.meta.env.VITE_AZURE_VISION_ENDPOINT || 'https://your_endpoint/vision/v3.2/analyze',
+  azureApiKey: import.meta.env.VITE_AZURE_VISION_KEY || '',
   deepseekApiUrl: 'https://api.deepseek.com/v1/chat/completions',
-  deepseekApiKey: 'sk-4ddf31a0ec5c4194b46cf770bd3402f5',
+  deepseekApiKey: import.meta.env.VITE_DEEPSEEK_API_KEY || '',
   useExternalApi: true,
   preferredProvider: 'azure' as 'azure' | 'deepseek' | 'cloud',
   cloudApiUrl: 'https://your-cloud-api.com/detect',
@@ -350,28 +350,41 @@ const DETECTION_CONFIG = {
 
 const initializeConfig = () => {
   try {
+    // Log environment variables status
+    console.log('Vision API Configuration:', {
+      hasVisionKey: !!import.meta.env.VITE_AZURE_VISION_KEY,
+      hasVisionEndpoint: !!import.meta.env.VITE_AZURE_VISION_ENDPOINT,
+      visionEndpoint: import.meta.env.VITE_AZURE_VISION_ENDPOINT
+    });
+    
+    // First try environment variables
+    if (import.meta.env.VITE_AZURE_VISION_KEY) {
+      API_CONFIG.azureApiKey = import.meta.env.VITE_AZURE_VISION_KEY;
+    }
+    if (import.meta.env.VITE_AZURE_VISION_ENDPOINT) {
+      API_CONFIG.azureApiUrl = import.meta.env.VITE_AZURE_VISION_ENDPOINT;
+    }
+    if (import.meta.env.VITE_DEEPSEEK_API_KEY) {
+      API_CONFIG.deepseekApiKey = import.meta.env.VITE_DEEPSEEK_API_KEY;
+    }
+    
+    // Then try localStorage as fallback
     const storedConfig = localStorage.getItem('vision_api_config');
     if (storedConfig) {
       const parsedConfig = JSON.parse(storedConfig);
-      Object.assign(API_CONFIG, parsedConfig);
-    }
-    
-    const deepseekApiKey = localStorage.getItem('deepseek_api_key');
-    if (deepseekApiKey) {
-      API_CONFIG.deepseekApiKey = deepseekApiKey;
-    }
-    
-    const azureApiKey = localStorage.getItem('azure_api_key');
-    if (azureApiKey) {
-      API_CONFIG.azureApiKey = azureApiKey;
-    }
-    
-    const cloudApiKey = localStorage.getItem('cloud_api_key');
-    if (cloudApiKey) {
-      API_CONFIG.cloudApiKey = cloudApiKey;
+      // Only use localStorage values if environment variables are not set
+      if (!import.meta.env.VITE_AZURE_VISION_ENDPOINT) {
+        API_CONFIG.azureApiUrl = parsedConfig.azureApiUrl || API_CONFIG.azureApiUrl;
+      }
+      if (!import.meta.env.VITE_AZURE_VISION_KEY) {
+        API_CONFIG.azureApiKey = parsedConfig.azureApiKey || API_CONFIG.azureApiKey;
+      }
+      API_CONFIG.useExternalApi = parsedConfig.useExternalApi ?? API_CONFIG.useExternalApi;
+      API_CONFIG.useCloudDetection = parsedConfig.useCloudDetection ?? API_CONFIG.useCloudDetection;
+      API_CONFIG.preferredProvider = parsedConfig.preferredProvider || API_CONFIG.preferredProvider;
     }
   } catch (error) {
-    console.error('Error loading stored configuration:', error);
+    console.error('Error loading configuration:', error);
   }
 };
 
@@ -477,13 +490,21 @@ const callAzureApi = async (
       return [];
     }
     
+    // Convert base64 to Uint8Array (no Node Buffer in browsers)
+    const binary = atob(imageData);
+    const len = binary.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
+
     const response = await fetch(API_CONFIG.azureApiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/octet-stream',
         'Ocp-Apim-Subscription-Key': API_CONFIG.azureApiKey
       },
-      body: Buffer.from(imageData, 'base64'),
+      body: bytes,
+      // Keep the request snappy on mobile networks; we'll fall back on timeout
+      signal: (AbortSignal as any).timeout ? (AbortSignal as any).timeout(4000) : undefined,
     });
     
     if (!response.ok) {

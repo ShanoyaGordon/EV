@@ -20,6 +20,7 @@ let isSpeaking = false;
 let availableVoices: SpeechSynthesisVoice[] = [];
 let preferredVoice: SpeechSynthesisVoice | null = null;
 let initialized = false;
+let speechWatchdog: number | null = null;
 
 // Initialize speech synthesis
 export function initSpeechSynthesis() {
@@ -73,7 +74,37 @@ export function initSpeechSynthesis() {
       // Create a silent utterance
       const silence = new SpeechSynthesisUtterance('');
       silence.volume = 0;
-      window.speechSynthesis.speak(silence);
+      silence.rate = 1.0;
+      
+      // Force unlock audio context on iOS
+      const unlockAudio = () => {
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        gainNode.gain.value = 0;
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        oscillator.start(0);
+        oscillator.stop(0.001);
+        
+        // Speak the silent utterance
+        window.speechSynthesis.speak(silence);
+        
+        // Resume audio context
+        if (audioContext.state === 'suspended') {
+          audioContext.resume();
+        }
+        
+        // Remove the event listeners after first use
+        document.removeEventListener('touchstart', unlockAudio);
+        document.removeEventListener('touchend', unlockAudio);
+        document.removeEventListener('click', unlockAudio);
+      };
+      
+      // Add event listeners for user interaction
+      document.addEventListener('touchstart', unlockAudio);
+      document.addEventListener('touchend', unlockAudio);
+      document.addEventListener('click', unlockAudio);
     }
     
     // Chrome loads voices asynchronously
@@ -250,19 +281,64 @@ function speakNow(
   
   try {
     isSpeaking = true;
-    window.speechSynthesis.speak(utterance);
+    
+    // iOS specific handling
+    if (isIOS) {
+      // Cancel any ongoing speech
+      window.speechSynthesis.cancel();
+      
+      // Start the watchdog
+      startSpeechWatchdog();
+      
+      // Small delay to ensure previous speech is cancelled
+      setTimeout(() => {
+        window.speechSynthesis.speak(utterance);
+        
+        // iOS sometimes needs a kick to start speaking
+        setTimeout(() => {
+          if (window.speechSynthesis.paused) {
+            window.speechSynthesis.resume();
+          }
+        }, 100);
+      }, 50);
+    } else {
+      window.speechSynthesis.speak(utterance);
+    }
   } catch (error) {
     isSpeaking = false;
+    stopSpeechWatchdog();
     reject(error);
   }
 }
 
 // Stop all speech
+// Start the watchdog timer to prevent speech from getting stuck
+function startSpeechWatchdog() {
+  if (speechWatchdog) {
+    clearInterval(speechWatchdog);
+  }
+  
+  speechWatchdog = window.setInterval(() => {
+    if (isIOS && window.speechSynthesis.paused) {
+      window.speechSynthesis.resume();
+    }
+  }, 1000);
+}
+
+// Stop the watchdog timer
+function stopSpeechWatchdog() {
+  if (speechWatchdog) {
+    clearInterval(speechWatchdog);
+    speechWatchdog = null;
+  }
+}
+
 export function stopSpeech() {
   if ('speechSynthesis' in window) {
     window.speechSynthesis.cancel();
     speechQueue = [];
     isSpeaking = false;
+    stopSpeechWatchdog();
   }
 }
 
