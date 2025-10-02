@@ -348,7 +348,13 @@ const Camera = () => {
           // Cooldown 3s per similar object to avoid spam
           if (nowTs - lastTs < 3000) continue;
           const message = createDescriptionFromObjects([obj]);
-          try { await announceSpeech(message); } catch {}
+          try {
+            // Slightly delay when using Cartesia so overlapping audio doesn't truncate
+            if (apiSettings.useCartesiaTTS && apiSettings.cartesiaApiKey) {
+              await new Promise(r => setTimeout(r, 50));
+            }
+            await announceSpeech(message);
+          } catch {}
           recentAnnouncementsRef.current[key] = nowTs;
           announcedCount++;
           if (announcedCount >= 2) break; // avoid flooding per frame
@@ -377,8 +383,11 @@ const Camera = () => {
         const now = Date.now();
         
         if ((now - lastAnnouncementTimeRef.current) > speechInterval) {
-          const message = prioritizedDetections.length > 0 
-            ? createDescriptionFromObjects(prioritizedDetections) 
+          const announcementCandidates = objectsWithinRange.length > 0
+            ? objectsWithinRange
+            : (prioritizedDetections.length > 0 ? prioritizedDetections : stabilizedDetections);
+          const message = (announcementCandidates && announcementCandidates.length > 0)
+            ? createDescriptionFromObjects(announcementCandidates)
             : "No objects detected at approximately one meter distance.";
             
           announceSpeech(message);
