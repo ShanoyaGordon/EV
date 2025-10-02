@@ -382,15 +382,13 @@ export function createDescriptionFromObjects(detections: DetectedObject[]): stri
   // Limit to closest 3 objects to avoid information overload
   const limitedObjects = nearbyObjects.slice(0, 3);
   
-  // Create concise, directive phrases for each object
+  // Create concise, directive phrases for each object in preferred style
   const objectDescriptions = limitedObjects.map(obj => {
     const label = normalizeObjectLabel(obj.label || 'object');
     const position = getObjectPosition(obj);
     const distance = obj.distance !== undefined ? obj.distance : 5;
 
-    const posWord = position === 'left' ? 'Left' : position === 'right' ? 'Right' : 'Ahead';
     let directive = '';
-
     if (position === 'center') {
       if (distance < 1.5) directive = 'stop';
       else if (distance < 3.5) directive = 'pass around';
@@ -400,7 +398,8 @@ export function createDescriptionFromObjects(detections: DetectedObject[]): stri
       if (distance < 5.0) directive = 'move left';
     }
 
-    const base = `${posWord} ${label} ${distance.toFixed(1)}m`;
+    const locationPhrase = position === 'left' ? 'to your left' : position === 'right' ? 'to your right' : 'ahead';
+    const base = `${label} ${locationPhrase}`;
     return directive ? `${base} — ${directive}` : base;
   });
   
@@ -458,7 +457,7 @@ export function generateNavigationInstructions(detections: DetectedObject[]): {
   }
   
   // Generate concise single instruction for the closest object
-  const posWord = objectPosition === 'left' ? 'Left' : objectPosition === 'right' ? 'Right' : 'Ahead';
+  const locationPhrase = objectPosition === 'left' ? 'to your left' : objectPosition === 'right' ? 'to your right' : 'ahead';
   let directive = '';
   if (objectPosition === 'center') {
     if (distanceMeters < 1.5) directive = 'stop';
@@ -469,7 +468,7 @@ export function generateNavigationInstructions(detections: DetectedObject[]): {
     if (distanceMeters < 5.0) directive = 'move left';
   }
 
-  const base = `${posWord} ${normalizedLabel} ${distanceMeters.toFixed(1)}m`;
+  const base = `${normalizedLabel} ${locationPhrase}`;
   const instruction = directive ? `${base} — ${directive}` : base;
   
   return {
